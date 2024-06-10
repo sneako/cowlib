@@ -26,7 +26,8 @@
 	path => binary(),
 	secure => true,
 	http_only => true,
-	same_site => default | none | strict | lax
+	same_site => default | none | strict | lax,
+	partitioned => false
 }.
 -export_type([cookie_attrs/0]).
 
@@ -36,7 +37,8 @@
 	max_age => non_neg_integer(),
 	path => binary(),
 	same_site => default | none | strict | lax,
-	secure => boolean()
+	secure => boolean(),
+	partitioned => boolean()
 }.
 -export_type([cookie_opts/0]).
 
@@ -284,6 +286,8 @@ parse_set_cookie_attr(<<"samesite">>, Value) ->
 		_ ->
 			{ok, same_site, default}
 	end;
+parse_set_cookie_attr(<<"partitioned">>, _) ->
+    {ok, partitioned, true};
 parse_set_cookie_attr(_, _) ->
 	ignore.
 
@@ -292,6 +296,7 @@ parse_set_cookie_test_() ->
 	Tests = [
 		{<<"a=b">>, {ok, <<"a">>, <<"b">>, #{}}},
 		{<<"a=b; Secure">>, {ok, <<"a">>, <<"b">>, #{secure => true}}},
+		{<<"a=b; Secure; Partitioned">>, {ok, <<"a">>, <<"b">>, #{secure => true, partitioned => true}}},
 		{<<"a=b; HttpOnly">>, {ok, <<"a">>, <<"b">>, #{http_only => true}}},
 		{<<"a=b; Expires=Wed, 21 Oct 2015 07:28:00 GMT; Expires=Wed, 21 Oct 2015 07:29:00 GMT">>,
 			{ok, <<"a">>, <<"b">>, #{expires => {{2015,10,21},{7,29,0}}}}},
@@ -376,6 +381,8 @@ attributes([{same_site, default}|Tail]) -> attributes(Tail);
 attributes([{same_site, none}|Tail]) -> [<<"; SameSite=None">>|attributes(Tail)];
 attributes([{same_site, lax}|Tail]) -> [<<"; SameSite=Lax">>|attributes(Tail)];
 attributes([{same_site, strict}|Tail]) -> [<<"; SameSite=Strict">>|attributes(Tail)];
+attributes([{partitioned, false}|Tail]) -> attributes(Tail);
+attributes([{partitioned, true}|Tail]) -> [<<"; Partitioned">>|attributes(Tail)];
 %% Skip unknown options.
 attributes([_|Tail]) -> attributes(Tail).
 
@@ -394,7 +401,10 @@ setcookie_test_() ->
 			#{secure => true},
 			<<"Customer=WILE_E_COYOTE; Secure">>},
 		{<<"Customer">>, <<"WILE_E_COYOTE">>,
-			#{secure => false, http_only => false},
+			#{secure => true, partitioned => true},
+			<<"Customer=WILE_E_COYOTE; Partitioned; Secure">>},
+		{<<"Customer">>, <<"WILE_E_COYOTE">>,
+			#{secure => false, http_only => false, partitioned => false},
 			<<"Customer=WILE_E_COYOTE">>},
 		{<<"Customer">>, <<"WILE_E_COYOTE">>,
 			#{same_site => default},
